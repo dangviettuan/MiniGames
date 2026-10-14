@@ -60,6 +60,8 @@ test('new move after Undo discards Redo branch and new game resets everything', 
 })
 
 test('real double cannon checkmate locks play, Undo reopens and Redo restores win', async ({ page }) => {
+ // 17 plies plus terminal/history/reset interactions exceed 30s on slower WebKit CI.
+ test.setTimeout(60_000)
  // Cooperative legal play from the standard opening. No injected boards or test hooks.
  const game = [
   [[6,4],[5,4]], [[3,0],[4,0]], [[5,4],[4,4]], [[3,8],[4,8]],
