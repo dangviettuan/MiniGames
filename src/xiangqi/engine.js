@@ -4,7 +4,7 @@ export const RED = 'red'
 export const BLACK = 'black'
 
 export const TXT = {
-  red: { general: '帥', advisor: '仕', elephant: '相', horse: '傌', rook: '俥', cannon: '炮', soldier: '兵' },
+  red: { general: '帥', advisor: '仕', elephant: '相', horse: '馬', rook: '車', cannon: '炮', soldier: '兵' },
   black: { general: '將', advisor: '士', elephant: '象', horse: '馬', rook: '車', cannon: '砲', soldier: '卒' },
 }
 
@@ -36,6 +36,7 @@ export function crossed(side, r) { return side === RED ? r <= 4 : r >= 5 }
 export function between(board, from, to) {
   const [fr, fc] = from
   const [tr, tc] = to
+  if (!inside(fr, fc) || !inside(tr, tc) || (fr === tr && fc === tc)) return -1
   let n = 0
   if (fr === tr) {
     const step = tc > fc ? 1 : -1
@@ -153,3 +154,24 @@ export function anyMove(board, side) {
   return false
 }
 
+
+// All turn validation and terminal decisions live in the engine, independent of React.
+export function positionResult(board, sideToMove) {
+  if (!findGeneral(board, sideToMove)) return { winner: enemy(sideToMove), reason: 'capture' }
+  if (!findGeneral(board, enemy(sideToMove))) return { winner: sideToMove, reason: 'capture' }
+  if (!anyMove(board, sideToMove)) {
+    return { winner: enemy(sideToMove), reason: inCheck(board, sideToMove) ? 'checkmate' : 'stalemate' }
+  }
+  return { winner: null, reason: null }
+}
+
+export function playMove(board, turn, from, to) {
+  if (!inside(...from) || board[from[0]][from[1]]?.side !== turn) return null
+  if (!findGeneral(board, turn) || !findGeneral(board, enemy(turn)) || !legal(board, from, to)) return null
+  const next = clone(board)
+  next[to[0]][to[1]] = next[from[0]][from[1]]
+  next[from[0]][from[1]] = null
+  const nextTurn = enemy(turn)
+  const result = positionResult(next, nextTurn)
+  return { board: next, turn: nextTurn, ...result }
+}
