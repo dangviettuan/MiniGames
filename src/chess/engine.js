@@ -160,5 +160,11 @@ export function makeMove(state, input) {
 }
 export function resign(state) {
   if (outcome(state)) throw new Error('Ván cờ đã kết thúc')
-  return { ...state, result: { winner: other(state.turn), reason: 'resignation' } }
+  const opponent = other(state.turn)
+  // A bare king can never checkmate, even with the resigning player's help.
+  // Do not attempt arbitrary cooperative-mate/dead-position proofs here.
+  const opponentHasPiece = state.board.some(p => color(p) === opponent && p.toLowerCase() !== 'k')
+  return { ...state, result: opponentHasPiece
+    ? { winner: opponent, reason: 'resignation' }
+    : { winner: null, reason: 'resignation-no-mating-material' } }
 }

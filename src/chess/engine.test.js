@@ -30,6 +30,15 @@ test('fools mate, terminal lock, resignation and previous immutable positions', 
   assert.deepEqual(resign(state).result,{winner:'b',reason:'resignation'})
   assert.equal(state.result,null); assert.equal(legalMoves(state).length,20)
 })
+test('resignation is a draw when the opponent has only a bare king', () => {
+  for (const fen of ['7k/8/8/8/8/8/Q7/K7 w - - 0 1','7k/7q/8/8/8/8/8/K7 b - - 0 1']) {
+    const state = fromFEN(fen), snapshot = JSON.stringify(state)
+    assert.equal(outcome(state),null)
+    assert.deepEqual(resign(state).result,{winner:null,reason:'resignation-no-mating-material'})
+    assert.equal(JSON.stringify(state),snapshot)
+  }
+  assert.throws(() => resign(fromFEN('7k/8/8/8/8/8/8/KB6 w - - 0 1')))
+})
 test('pinned pieces cannot expose king and kings cannot be captured', () => {
   const s = fromFEN('4r1k1/8/8/8/8/8/4R3/4K3 w - - 0 1')
   assert.throws(() => play(s,'e2d2')); assert.ok(destinations(s,'e2').includes(square('e8')))

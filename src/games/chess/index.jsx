@@ -5,7 +5,7 @@ import './style.css'
 const glyphs = { K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟' }
 const names = { k:'Vua',q:'Hậu',r:'Xe',b:'Tượng',n:'Mã',p:'Tốt' }
 const sideName = side => side === 'w' ? 'Trắng' : 'Đen'
-const reasonNames = { checkmate:'chiếu hết',stalemate:'hết nước đi hợp lệ',resignation:'đầu hàng','insufficient-material':'không đủ quân để chiếu hết',repetition:'lặp vị trí 3 lần','fivefold-repetition':'lặp vị trí 5 lần','fifty-move':'50 nước không bắt quân hoặc đi tốt','seventy-five-move':'75 nước không bắt quân hoặc đi tốt' }
+const reasonNames = { checkmate:'chiếu hết',stalemate:'hết nước đi hợp lệ',resignation:'đầu hàng','resignation-no-mating-material':'đầu hàng khi đối phương chỉ còn vua, không thể chiếu hết','insufficient-material':'không đủ quân để chiếu hết',repetition:'lặp vị trí 3 lần','fivefold-repetition':'lặp vị trí 5 lần','fifty-move':'50 nước không bắt quân hoặc đi tốt','seventy-five-move':'75 nước không bắt quân hoặc đi tốt' }
 function Chess() {
   const [timeline,setTimeline] = useState(() => [initialState()]), [cursor,setCursor] = useState(0)
   const [selected,setSelected] = useState(null), [error,setError] = useState(''), [promotion,setPromotion] = useState(null), [flipped,setFlipped] = useState(false), [confirmResign,setConfirmResign] = useState(false)
@@ -61,7 +61,7 @@ function Chess() {
       <aside className="mg-panel">
         <h2>Lịch sử ván cờ</h2>
         <p>{cursor} thao tác · {Math.min(Math.floor(cursor/2)+1,state.fullmove)} lượt</p>
-        <ol className="mg-history chess-history" aria-label="Lịch sử nước đi">{timeline.slice(1,cursor+1).map((s,i) => <li key={i}>{s.result?.reason === 'resignation' ? `${sideName(s.turn)} đầu hàng` : ['repetition','fifty-move'].includes(s.result?.reason) && s.lastMove === timeline[i].lastMove ? 'Yêu cầu hòa' : `${sideName(timeline[i].turn)}: ${algebraic(s.lastMove.from)} → ${algebraic(s.lastMove.to)}${s.lastMove.promotion ? ' = '+names[s.lastMove.promotion] : ''}${s.lastMove.castle ? ' (nhập thành)' : ''}${s.lastMove.enPassant ? ' (bắt tốt qua đường)' : ''}`}</li>)}</ol>
+        <ol className="mg-history chess-history" aria-label="Lịch sử nước đi">{timeline.slice(1,cursor+1).map((s,i) => <li key={i}>{s.result?.reason.startsWith('resignation') ? `${sideName(s.turn)} đầu hàng` : ['repetition','fifty-move'].includes(s.result?.reason) && s.lastMove === timeline[i].lastMove ? 'Yêu cầu hòa' : `${sideName(timeline[i].turn)}: ${algebraic(s.lastMove.from)} → ${algebraic(s.lastMove.to)}${s.lastMove.promotion ? ' = '+names[s.lastMove.promotion] : ''}${s.lastMove.castle ? ' (nhập thành)' : ''}${s.lastMove.enPassant ? ' (bắt tốt qua đường)' : ''}`}</li>)}</ol>
         <details className="mg-rules" open><summary>Luật và cách chơi</summary><p>Trắng đi trước. Không được để vua bị chiếu. Nhập thành bằng cách chọn vua rồi chọn c1/g1 hoặc c8/g8; đường đi phải an toàn, vua và xe chưa từng di chuyển.</p><p>Tốt được đi 2 ô từ vị trí đầu; bắt qua đường chỉ ngay sau nước tốt đi 2 ô. Đến hàng cuối, chọn Hậu, Xe, Tượng hoặc Mã.</p><p>Chiếu hết là thắng. Hết nước hợp lệ khi không bị chiếu hoặc không đủ quân chiếu hết là hòa. Có thể yêu cầu hòa khi vị trí lặp 3 lần hoặc đủ 50 nước mỗi bên không bắt quân/đi tốt. Tự hòa tại 5 lần hoặc 75 nước; chiếu hết được ưu tiên.</p><p>Undo/Redo dùng được cả sau khi ván kết thúc. Đi nước mới sau Undo sẽ bỏ các nước tương lai. Chưa có đồng hồ, AI hoặc chơi mạng.</p></details>
       </aside>
     </div>
