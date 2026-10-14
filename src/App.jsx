@@ -6,8 +6,8 @@ const RED = 'red'
 const BLACK = 'black'
 
 const TXT = {
-  red: { general: '帥', advisor: '士', elephant: '相', horse: '傌', rook: '俥', cannon: '炮', soldier: '兵' },
-  black: { general: '將', advisor: '仕', elephant: '象', horse: '馬', rook: '車', cannon: '砲', soldier: '卒' },
+  red: { general: '帥', advisor: '仕', elephant: '相', horse: '傌', rook: '俥', cannon: '炮', soldier: '兵' },
+  black: { general: '將', advisor: '士', elephant: '象', horse: '馬', rook: '車', cannon: '砲', soldier: '卒' },
 }
 
 const NAMES = { red: 'Đỏ', black: 'Đen' }
@@ -83,7 +83,7 @@ function rawValid(board, from, to) {
 
   switch (p.type) {
     case 'general':
-      return palace(p.side, tr, tc) && adr + adc === 1
+      return (palace(p.side, tr, tc) && adr + adc === 1) || (t?.type === 'general' && t.side !== p.side && fc === tc && between(board, from, to) === 0)
     case 'advisor':
       return palace(p.side, tr, tc) && adr === 1 && adc === 1
     case 'elephant': {
@@ -206,13 +206,12 @@ export default function App() {
         const nextTurn = enemy(turn)
         const live = !!findGeneral(next, nextTurn)
         const foeHasMove = live ? anyMove(next, nextTurn) : false
-        const foeCheck = live ? inCheck(next, nextTurn) : true
 
         setBoard(next)
         setPick(null)
         setHistory(prev => [`${NAMES[turn]}: ${moving.type} ${sr},${sc} → ${r},${c}${captured ? ` ăn ${captured.type}` : ''}`, ...prev].slice(0, 24))
 
-        if (!live || !foeHasMove || (foeCheck && !foeHasMove)) {
+        if (!live || !foeHasMove) {
           setWinner(turn)
         } else {
           setTurn(nextTurn)
@@ -283,7 +282,7 @@ export default function App() {
           .wrap{grid-template-columns:1fr}
           .top{flex-direction:column;align-items:stretch}
           .btn{width:100%}
-          .stats{grid-template-columns:1fr}
+          .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:last-child{grid-column:1/-1}
           .boardShell{padding:10px}
           .piece{inset:9%;font-size:clamp(20px,7vw,30px)}
           aside{gap:14px}
@@ -322,7 +321,7 @@ export default function App() {
                 const selected = !!pick && pick[0] === r && pick[1] === c
                 const canMove = moveSet.has(`${r}-${c}`)
                 return (
-                  <button key={`${r}-${c}`} className={boardCellClass(r, c, selected)} onClick={() => clickCell(r, c)}>
+                  <button key={`${r}-${c}`} type="button" aria-label={`Hàng ${r + 1}, cột ${c + 1}${piece ? `, ${NAMES[piece.side]} ${piece.type}` : ", trống"}${selected ? ", đang chọn" : ""}${canMove ? ", có thể đi tới" : ""}`} aria-pressed={selected} className={boardCellClass(r, c, selected)} onClick={() => clickCell(r, c)}>
                     {canMove ? <span className="dot" /> : null}
                     {piece ? <span className={`piece ${piece.side}`}>{label(piece)}</span> : null}
                   </button>
