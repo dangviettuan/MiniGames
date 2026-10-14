@@ -13,6 +13,8 @@ implemented; the game states this limitation in its rules panel.
 
 ## Review changes
 
+- Scope sidebar and heading styles to Xiangqi so tablet layout cannot leak into other games.
+
 - Fixed an infinite loop in exported `between` for identical endpoints.
 - Moved terminal resolution and turn validation out of the UI into the engine.
   The UI now distinguishes checkmate, stalemate and general capture.

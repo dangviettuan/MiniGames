@@ -99,7 +99,7 @@ export default function App() {
 
         .card{background:rgba(255,250,244,.9);border:1px solid rgba(139,92,45,.18);backdrop-filter:blur(8px);border-radius:24px;box-shadow:0 14px 38px rgba(120,53,15,.1);padding:18px}
         .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
-        h1{font-size:clamp(24px,3.8vw,42px);line-height:1.08;margin:0 0 8px}
+        .app h1{font-size:clamp(24px,3.8vw,42px);line-height:1.08;margin:0 0 8px}
         .sub{margin:0;color:var(--muted);font-size:clamp(14px,1.7vw,18px)}
 
         .btn{border:none;border-radius:14px;padding:12px 18px;background:linear-gradient(135deg,#f97316,#c2410c);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(194,65,12,.28);min-height:46px}
@@ -122,8 +122,8 @@ export default function App() {
         .meta{display:flex;justify-content:space-between;gap:14px;margin-top:10px;color:#7c2d12;font-weight:700}
         .river{font-size:clamp(12px,1.4vw,15px);opacity:.88}
 
-        aside{display:grid;gap:20px;align-content:start}
-        h2{margin:0 0 12px;font-size:22px}
+        .app aside{display:grid;gap:20px;align-content:start}
+        .app h2{margin:0 0 12px;font-size:22px}
         .rules{margin:0;padding-left:18px;line-height:1.65;color:#44403c}
         .history{display:grid;gap:8px;max-height:460px;overflow:auto;padding-right:2px}
         .item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;color:#334155;font-size:14px}
@@ -136,7 +136,7 @@ export default function App() {
           .card{padding:16px}
           .boardShell{padding:12px}
           .piece{font-size:clamp(22px,3.2vw,34px)}
-          aside{grid-template-columns:1fr 1fr;gap:16px}
+          .app aside{grid-template-columns:1fr 1fr;gap:16px}
         }
 
         @media (max-width:767px){
@@ -146,8 +146,8 @@ export default function App() {
           .btn{width:100%}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.controls .btn{padding:10px 4px;font-size:13px}
           .card{padding:10px}.top{gap:10px}.sub{font-size:13px}.stats{gap:6px;grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:8px 6px}.k{font-size:10px}.v{font-size:14px}.boardShell{padding:5px}.meta{gap:8px}.river{font-size:11px}
           .piece{inset:6%;border-width:2px;font-size:clamp(15px,5.3vw,28px)}
-          aside{gap:14px}
-          h2{font-size:20px}
+          .app aside{gap:14px}
+          .app h2{font-size:20px}
         }
       `}</style>
 
