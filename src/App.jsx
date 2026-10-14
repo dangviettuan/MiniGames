@@ -14,7 +14,9 @@ export default function App() {
   const [turn, setTurn] = useState(RED)
   const [pick, setPick] = useState(null)
   const [winner, setWinner] = useState(null)
-  const [history, setHistory] = useState([])
+  const [timeline, setTimeline] = useState([])
+  const [cursor, setCursor] = useState(0)
+  const history = timeline.slice(0, cursor).map(entry => entry.description).reverse()
 
   const moves = useMemo(() => {
     if (!pick || winner) return []
@@ -31,7 +33,19 @@ export default function App() {
     setTurn(RED)
     setPick(null)
     setWinner(null)
-    setHistory([])
+    setTimeline([])
+    setCursor(0)
+  }
+
+  function navigate(delta) {
+    const target = cursor + delta
+    if (target < 0 || target > timeline.length) return
+    const state = delta < 0 ? timeline[cursor - 1].before : timeline[cursor].after
+    setBoard(clone(state.board))
+    setTurn(state.turn)
+    setWinner(state.winner)
+    setPick(null)
+    setCursor(target)
   }
 
   function clickCell(r, c) {
@@ -56,7 +70,8 @@ export default function App() {
 
         setBoard(next)
         setPick(null)
-        setHistory(prev => [`${NAMES[turn]}: ${moving.type} ${sr},${sc} → ${r},${c}${captured ? ` ăn ${captured.type}` : ''}`, ...prev].slice(0, 24))
+        setTimeline(prev => [...prev.slice(0, cursor), { before: { board: clone(board), turn, winner }, after: { board: clone(next), turn: (!live || !foeHasMove) ? turn : nextTurn, winner: (!live || !foeHasMove) ? turn : null }, description: `${NAMES[turn]}: ${moving.type} ${sr},${sc} → ${r},${c}${captured ? ` ăn ${captured.type}` : ''}` }])
+        setCursor(cursor + 1)
 
         if (!live || !foeHasMove) {
           setWinner(turn)
@@ -88,7 +103,7 @@ export default function App() {
         .sub{margin:0;color:var(--muted);font-size:clamp(14px,1.7vw,18px)}
 
         .btn{border:none;border-radius:14px;padding:12px 18px;background:linear-gradient(135deg,#f97316,#c2410c);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(194,65,12,.28);min-height:46px}
-        .btn:active{transform:translateY(1px)}
+        .btn:active{transform:translateY(1px)}.btn:disabled{opacity:.4;cursor:not-allowed}.controls{display:flex;gap:8px;flex-wrap:wrap}.btn.secondary{background:#fff7ed;color:#9a3412;border:1px solid #fdba74;box-shadow:none}
 
         .stats{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px}
         .stat{background:#fef1da;border:1px solid rgba(139,92,45,.12);border-radius:14px;padding:12px}
@@ -128,7 +143,7 @@ export default function App() {
           .app{padding:12px}
           .wrap{grid-template-columns:1fr}
           .top{flex-direction:column;align-items:stretch}
-          .btn{width:100%}
+          .btn{width:100%}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.controls .btn{padding:10px 4px;font-size:13px}
           .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:last-child{grid-column:1/-1}
           .boardShell{padding:10px}
           .piece{inset:9%;font-size:clamp(20px,7vw,30px)}
@@ -144,7 +159,7 @@ export default function App() {
               <h1>Cờ tướng 2 người chơi</h1>
               <p className="sub">UI tối ưu cho cảm ứng iPad, dễ nhìn khi đặt ngang hoặc dọc.</p>
             </div>
-            <button className="btn" onClick={reset}>Ván mới</button>
+            <div className="controls"><button className="btn secondary" onClick={() => navigate(-1)} disabled={cursor === 0}>↶ Undo</button><button className="btn secondary" onClick={() => navigate(1)} disabled={cursor === timeline.length}>↷ Redo</button><button className="btn" onClick={reset}>Ván mới</button></div>
           </div>
 
           <div className="stats">
