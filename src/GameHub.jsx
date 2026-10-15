@@ -7,7 +7,7 @@ const games = [{ id: 'xiangqi', title: 'Cờ tướng', component: Xiangqi }, ..
 export default function GameHub() {
   const readHash = () => games.some(g => g.id === location.hash.slice(1)) ? location.hash.slice(1) : 'xiangqi'
   const [active, setActive] = useState(readHash)
-  React.useEffect(() => { const sync = () => setActive(readHash()); window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync) }, [])
+  React.useEffect(() => { const sync = () => { setActive(readHash()); window.scrollTo({top:0,left:0,behavior:'instant'}) };  window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync) }, [])
   const game = games.find(g => g.id === active) || games[0]
   return <><nav className="game-nav" aria-label="Chọn trò chơi">{games.map(g => <a key={g.id} href={'#'+g.id} aria-current={g.id === game.id ? 'page' : undefined}>{g.title}</a>)}</nav><main>{games.map(g => { const Game = g.component; return <section key={g.id} hidden={g.id !== game.id} aria-label={g.title}><Game/></section> })}</main></>
 }

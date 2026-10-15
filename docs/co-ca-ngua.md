@@ -4,25 +4,32 @@ Local 2–4 player Vietnamese horse race, sharing one browser. Two players sit o
 
 ## Rules selected before play
 
-- One die, either **1 or 6** to leave the stable (default), or **6 only** as an explicit setup option.
-- A 6 grants an additional roll, including when no move is possible. Other unplayable rolls automatically pass the turn, with a status message.
-- Every player travels 56 track squares from their own starting square, then enters their private six-slot home lane. The starting square is progress 0 and home slot 1 is progress 56.
-- No safe squares. Landing exactly on any opponent, even on a starting square, returns that horse to the stable. No jumping any occupied track square; cannot land on one's own horse.
-- Home movement is by the exact die, cannot exceed slot 6, cannot jump or land on another home horse. The staged-home win is four horses occupying slots **3, 4, 5, 6**. Bring the first horse to 6, then the next to 5, then 4, then 3 to avoid blocking each other.
-- After rolling, a legal move must be made before another roll. Choose a horse via the board or the large move-option controls, then confirm via its highlighted destination or the action button.
-- Undo/Redo includes rolls, moves, captures, skipped turns, winners, and alternative move branches. A persistent roll tape means undoing a roll and trying again produces the same number; branching cannot fish for a different roll. Starting a fresh game resets the tape and requires confirmation when a game exists.
+- One die, **1 or 6** to leave the stable (default), or **6 only** as an explicit setup option.
+- A 6 grants another roll, including when no move is possible. Other unplayable rolls automatically pass the turn with visible feedback.
+- Every player travels 56 track squares from their own starting square, then enters their private six-slot home lane. Starting square is progress 0; home slot 1 is progress 56.
+- No safe squares. Landing exactly on an opponent, including a starting square, returns that horse to the stable. Cannot jump any occupied track square or land on one's own horse.
+- Home movement follows the exact die, cannot exceed slot 6, jump or land on another home horse. Win with four horses occupying **3, 4, 5, 6**. Bring horses to 6, then 5, then 4, then 3 to avoid blocking.
+- A pending legal roll must be moved before another roll. Select via board or large numbered controls, then tap the highlighted destination or the move button. Blocked horse controls explain the reason instead of silently ignoring selection.
+- Undo/Redo includes rolls, captures, skipped turns, winners and branches. Persistent roll tape prevents fishing for a different roll by undoing.
 
-## Implementation
+## UI and persistence
 
-`src/co-ca-ngua/engine.js` contains immutable pure transitions. Randomness is supplied as an RNG argument to `rollDice`; the UI supplies `crypto.getRandomValues`. The UI samples new randomness in the click event before passing a deterministic updater to React; StrictMode cannot consume two dice values by re-invoking an updater. Existing tape entries consume no fresh randomness. Game history and deterministic replay are engine-owned. No production test state hooks are exposed.
+`src/co-ca-ngua/engine.js` remains the immutable pure engine. The UI samples crypto RNG once in the click event before passing a deterministic updater to React, so StrictMode cannot consume extra dice. Existing tape entries consume no new randomness.
 
-The responsive UI shows a 16×16 cross board containing exactly 56 track cells. Color and horse numbers identify pieces; legal and selected destinations have outlines. A separate set of large controls remains available on touch screens where individual track cells are smaller. On mobile, the board appears first below a compact title, followed by one compact control dock containing the roll, die, history, horse choices and move action. Secondary help and rules stay collapsed. The board scales against viewport height. Playwright requires the entire board and all turn controls to be simultaneously visible before and after rolling, so automatic scrolling cannot hide this interaction constraint. Native modal reset confirmation traps focus and supports Escape. Visible rules appear before the first game and remain expandable while playing.
+The shared `PlayLayout` puts the board next to a control rail on desktop/landscape, and below the compact heading/status on portrait phones. Portrait uses available width rather than crushing the board against a fixed height budget: at 360×640 the board is 340 pixels wide. Large horse-choice buttons are available because individual track cells remain smaller touch targets. Secondary rules may scroll; the normal roll/select/move loop stays adjacent to the board.
+
+All horse symbols are clipped SVG viewports constrained to their actual cell; SVG number badges fit within the same bounds. Stable pieces inherit their player color. Direction arrows remain visible around the entire route, including inactive sides in a two-player game. Colored home numbers and a ⌂ entry symbol explain the way home. The centerpiece communicates circuit direction rather than a technical square count.
+
+The last move is derived from engine history, with a gold destination, dashed origin and a concise actor/horse/from/to label. This survives subsequent rolls, undo/redo and reload. Current player and the engine's move/skip/win explanation remain visible above the board.
+
+`useStoredGame` saves `{ game, players, startRule }`, including dice tape, cursor, pending die and all past/future snapshots. Validation checks setup, seats, integer positions, phases, dice, winner and each history snapshot before restoration. Malformed data returns to setup. Storage failure uses the shared visible warning. New game is under Tùy chọn and opens the shared confirmation dialog; cancel preserves game and history.
 
 ## Verification
 
-- Unit tests cover 2/3/4-player setup; alternate stable rules; automatic skipped turns; six bonus; pending-move roll lock; capture on a start square; jumping/own-occupant blocks; full-lap home entry; exact home overshoot; home blocking; staged-home win; undo/redo of terminal state; alternate branches and deterministic dice replay; invalid RNG inputs.
-- Playwright tests use normal UI clicks and browser-only seeded `crypto.getRandomValues`. No board injection or direct engine calls. Flows cover setup, a highlighted board destination, blocked stable exits, auto-passing, undo/redo, dice replay, four-player/six-only setup, reset/cancel, and a complete legal 45-move win with undo/redo of the winning move.
-- Additional development-server verification with React StrictMode enabled seeded successive dice 6 and 1, rolled/moved/rolled via normal UI clicks, and verified exactly 6 then 1 on both Pixel 7 and iPad. This catches RNG consumption inside a re-invoked state updater, which a production-only test would miss.
-- The same scenarios run under desktop, iPad and mobile projects. Local iPad runs use Chromium emulation if WebKit is unavailable; CI should retain the real configured iPad/WebKit project. Such local emulation does not certify Safari behavior.
+- Existing engine tests still cover alternate stable rules, skipped turns, six bonus, pending-roll lock, start capture, jump/own-occupant blocks, full-lap entry, exact home, win, undo/redo, branching, replay and RNG validation.
+- Browser tests drive normal UI clicks with seeded browser crypto, without production state hooks. They play a full legal 45-move win and an opposing starting-square capture, including terminal/capture Undo/Redo. A separate Yellow-captures-Red regression verifies that recent-move labels and origin/destination highlights identify the moving player rather than the lower-index captured seat, including after reload.
+- Persistence checks reload a pending roll, replay the same die after undo, restore a completed move and its last-move highlight, and retain Undo/Redo history. A malformed stored game safely returns to setup.
+- Viewport checks cover desktop, iPad and Pixel 7, plus 393×851, 360×640 and touch 851×393 landscape. They check readable board width, actual cell width, SVG containment, no horizontal overflow, last-move feedback and board/primary-control visibility. Additional rules are deliberately allowed below the fold.
+- Local iPad tests use Chromium emulation when WebKit is unavailable; CI keeps the real configured iPad/WebKit project. Chromium emulation does not certify Safari behavior.
 
 Commands: `npm test`, `npm run build`, `npm run test:e2e -- e2e/co-ca-ngua.spec.js`.

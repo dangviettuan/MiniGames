@@ -1,227 +1,58 @@
 import React, { useMemo, useState } from 'react'
-
-import { RED, NAMES, initBoard, label, clone, inCheck, legalMoves, playMove } from './xiangqi/engine.js'
+import { PlayLayout, ConfirmDialog } from './shared/PlayLayout.jsx'
+import { useStoredGame } from './shared/useStoredGame.js'
+import { NAMES, label, inCheck, legalMoves, playMove } from './xiangqi/engine.js'
+import { initialGame, validStoredGame, position } from './xiangqi/state.js'
+import './xiangqi/style.css'
 
 const END_REASONS = { capture: 'Ăn tướng', checkmate: 'Chiếu bí', stalemate: 'Hết nước hợp lệ' }
 const PIECE_NAMES = { general: 'Tướng', advisor: 'Sĩ', elephant: 'Tượng', horse: 'Mã', rook: 'Xe', cannon: 'Pháo', soldier: 'Tốt' }
-
-function boardCellClass(r, c, selected) {
-  let cls = 'cell'
-  if ((r + c) % 2 === 0) cls += ' alt'
-  if (selected) cls += ' sel'
-  return cls
-}
+const sameSquare = (a,b) => a && b && a[0]===b[0] && a[1]===b[1]
 
 export default function App() {
-  const [board, setBoard] = useState(initBoard)
-  const [turn, setTurn] = useState(RED)
-  const [pick, setPick] = useState(null)
-  const [winner, setWinner] = useState(null)
-  const [winnerReason, setWinnerReason] = useState(null)
-  const [timeline, setTimeline] = useState([])
-  const [cursor, setCursor] = useState(0)
-  const history = timeline.slice(0, cursor).map(entry => entry.description).reverse()
-
-  const moves = useMemo(() => {
-    if (!pick || winner) return []
-    const p = board[pick[0]][pick[1]]
-    if (!p || p.side !== turn) return []
-    return legalMoves(board, pick)
-  }, [board, pick, turn, winner])
-
-  const moveSet = useMemo(() => new Set(moves.map(([r, c]) => `${r}-${c}`)), [moves])
-  const checked = !winner && inCheck(board, turn)
-
-  function reset() {
-    setBoard(initBoard())
-    setTurn(RED)
-    setPick(null)
-    setWinner(null)
-    setWinnerReason(null)
-    setTimeline([])
-    setCursor(0)
-  }
-
+  const [game,setGame,saved]=useStoredGame('xiangqi',initialGame,validStoredGame)
+  const [pick,setPick]=useState(null), [feedback,setFeedback]=useState(''), [confirm,setConfirm]=useState(false)
+  const {board,turn,winner,reason,timeline,cursor,flipped,coordinates}=game
+  const moves=useMemo(()=>pick && !winner ? legalMoves(board,pick) : [],[board,pick,winner])
+  const moveSet=new Set(moves.map(([r,c])=>`${r}-${c}`))
+  const checked=!winner && inCheck(board,turn)
+  const last=cursor ? timeline[cursor-1] : null
+  const selected=pick && board[pick[0]][pick[1]]
   function navigate(delta) {
-    const target = cursor + delta
-    if (target < 0 || target > timeline.length) return
-    const state = delta < 0 ? timeline[cursor - 1].before : timeline[cursor].after
-    setBoard(clone(state.board))
-    setTurn(state.turn)
-    setWinner(state.winner)
-    setWinnerReason(state.reason)
-    setPick(null)
-    setCursor(target)
+    const target=cursor+delta
+    if(target<0 || target>timeline.length) return
+    const restored=delta<0 ? timeline[cursor-1].before : timeline[cursor].after
+    setGame({...game,...restored,cursor:target});setPick(null);setFeedback('')
   }
-
-  function clickCell(r, c) {
-    if (winner) return
-    const piece = board[r][c]
-    if (pick) {
-      const [sr, sc] = pick
-      if (piece && piece.side === turn) {
-        setPick(sr === r && sc === c ? null : [r, c])
-        return
-      }
-      const result = playMove(board, turn, [sr, sc], [r, c])
-      if (result) {
-        const moving = board[sr][sc]
-        const captured = board[r][c]
-        setBoard(result.board)
-        setTurn(result.turn)
-        setWinner(result.winner)
-        setWinnerReason(result.reason)
-        setPick(null)
-        setTimeline(prev => [...prev.slice(0, cursor), {
-          before: { board: clone(board), turn, winner, reason: winnerReason },
-          after: result,
-          description: `${NAMES[turn]}: ${PIECE_NAMES[moving.type]} ${sr + 1},${sc + 1} → ${r + 1},${c + 1}${captured ? ` ăn ${PIECE_NAMES[captured.type]}` : ''}`,
-        }])
-        setCursor(cursor + 1)
-        return
-      }
-    }
-
-    if (piece && piece.side === turn) setPick([r, c])
-    else setPick(null)
+  function clickCell(r,c) {
+    if(winner) return
+    const piece=board[r][c]
+    if(piece?.side===turn) {setPick(sameSquare(pick,[r,c])?null:[r,c]);setFeedback('');return}
+    if(!pick) {setFeedback(piece ? `Đến lượt ${NAMES[turn]}. Hãy chọn quân của mình.` : 'Hãy chọn quân của mình trước.');return}
+    const [sr,sc]=pick, result=playMove(board,turn,pick,[r,c])
+    if(!result) {setFeedback('Nước đi không hợp lệ. Chọn ô có dấu chấm hoặc vòng tròn; không được để tướng bị chiếu.');return}
+    const moving=board[sr][sc], captured=board[r][c]
+    const description=`${NAMES[turn]}: ${PIECE_NAMES[moving.type]} ${sr+1},${sc+1} → ${r+1},${c+1}${captured?` ăn ${PIECE_NAMES[captured.type]}`:''}`
+    setGame({...game,...result,timeline:[...timeline.slice(0,cursor),{before:position(game),after:result,from:[sr,sc],to:[r,c],description}],cursor:cursor+1})
+    setPick(null);setFeedback('')
   }
-
-  return (
-    <div className="app">
-      <style>{`
-        :root{--bg:#f7efe2;--board:#f4cf94;--line:#8b5a2b;--card:#fffaf4;--text:#1f2937;--muted:#57534e;--orange:#ea580c}
-        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-        body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:radial-gradient(circle at top left,#fff9f0,#fef3c7 60%,#f9d27d)}
-        button,input,select{font:inherit}
-
-        .app{min-height:100svh;padding:calc(16px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));color:var(--text)}
-        .wrap{max-width:1366px;margin:0 auto;display:grid;gap:20px;grid-template-columns:minmax(0,1.45fr) minmax(320px,.9fr)}
-
-        .card{background:rgba(255,250,244,.9);border:1px solid rgba(139,92,45,.18);backdrop-filter:blur(8px);border-radius:24px;box-shadow:0 14px 38px rgba(120,53,15,.1);padding:18px}
-        .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
-        .app h1{font-size:clamp(24px,3.8vw,42px);line-height:1.08;margin:0 0 8px}
-        .sub{margin:0;color:var(--muted);font-size:clamp(14px,1.7vw,18px)}
-
-        .btn{border:none;border-radius:14px;padding:12px 18px;background:linear-gradient(135deg,#f97316,#c2410c);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(194,65,12,.28);min-height:46px}
-        .btn:active{transform:translateY(1px)}.btn:disabled{opacity:.4;cursor:not-allowed}.controls{display:flex;gap:8px;flex-wrap:wrap}.btn.secondary{background:#fff7ed;color:#9a3412;border:1px solid #fdba74;box-shadow:none}
-
-        .stats{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px}
-        .stat{background:#fef1da;border:1px solid rgba(139,92,45,.12);border-radius:14px;padding:12px}
-        .k{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
-        .v{margin-top:2px;font-size:18px;font-weight:800;line-height:1.2}
-
-        .boardShell{background:linear-gradient(180deg,#f7d8a3,#efc786);padding:14px;border-radius:20px;border:2px solid rgba(139,92,45,.35)}
-        .board{position:relative;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr));aspect-ratio:9/10;background:#f4cf94;border:2px solid var(--line);border-radius:12px;overflow:hidden}.boardLines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-        .cell{position:relative;min-width:0;min-height:0;padding:0;background:transparent;border:0;cursor:pointer;z-index:1}
-        .cell.alt{background:transparent}
-        .cell.sel .piece{box-shadow:0 0 0 4px #fb923c,0 5px 10px #5555}
-        .dot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:999px;background:rgba(120,53,15,.55);border:2px solid rgba(255,255,255,.7)}
-        .piece{position:absolute;inset:7%;display:grid;place-items:center;border-radius:999px;background:#fffdf8;border:3px solid #1f2937;box-shadow:0 5px 10px rgba(31,41,55,.16);font-size:clamp(20px,2.35vw,30px);font-weight:800;user-select:none}
-        .piece.red{color:#b91c1c;border-color:#b91c1c}
-
-        .meta{display:flex;justify-content:space-between;gap:14px;margin-top:10px;color:#7c2d12;font-weight:700}
-        .river{font-size:clamp(12px,1.4vw,15px);opacity:.88}
-
-        .app aside{display:grid;gap:20px;align-content:start}
-        .app h2{margin:0 0 12px;font-size:22px}
-        .rules{margin:0;padding-left:18px;line-height:1.65;color:#44403c}
-        .history{display:grid;gap:8px;max-height:460px;overflow:auto;padding-right:2px}
-        .item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;color:#334155;font-size:14px}
-        .muted{color:#78716c}
-
-        @media (min-width:768px) and (max-width:1194px){
-          .app{padding:16px}
-          .wrap{grid-template-columns:minmax(0,1fr)}
-          .top{align-items:center}
-          .card{padding:16px}
-          .boardShell{padding:12px}
-          .piece{font-size:clamp(22px,3.2vw,34px)}
-          .app aside{grid-template-columns:1fr 1fr;gap:16px}
-        }
-
-        @media (max-width:767px){
-          .app{padding:12px}
-          .wrap{grid-template-columns:1fr}
-          .top{flex-direction:column;align-items:stretch}
-          .btn{width:100%}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.controls .btn{padding:10px 4px;font-size:13px}
-          .card{padding:10px}.top{gap:10px}.sub{font-size:13px}.stats{gap:6px;grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:8px 6px}.k{font-size:10px}.v{font-size:14px}.boardShell{padding:5px}.meta{gap:8px}.river{font-size:11px}
-          .piece{inset:6%;border-width:2px;font-size:clamp(15px,5.3vw,28px)}
-          .app aside{gap:14px}
-          .app h2{font-size:20px}
-        }
-      `}</style>
-
-      <div className="wrap">
-        <section className="card">
-          <div className="top">
-            <div>
-              <h1>Cờ tướng 2 người chơi</h1>
-              <p className="sub">Hai người cùng thiết bị. Đỏ đi trước; chạm quân rồi chạm ô đích.</p>
-            </div>
-            <div className="controls"><button className="btn secondary" onClick={() => navigate(-1)} disabled={cursor === 0}>↶ Undo</button><button className="btn secondary" onClick={() => navigate(1)} disabled={cursor === timeline.length}>↷ Redo</button><button className="btn" onClick={reset}>Ván mới</button></div>
-          </div>
-
-          <div className="stats" role="status" aria-live="polite" aria-atomic="true">
-            <div className="stat">
-              <div className="k">Lượt hiện tại</div>
-              <div className="v">{winner ? 'Kết thúc' : NAMES[turn]}</div>
-            </div>
-            <div className="stat">
-              <div className="k">Trạng thái</div>
-              <div className="v">{winner ? `Thắng: ${NAMES[winner]} • ${END_REASONS[winnerReason]}` : checked ? `${NAMES[turn]} đang bị chiếu` : 'Bình thường'}</div>
-            </div>
-            <div className="stat">
-              <div className="k">Quân đang chọn</div>
-              <div className="v">{pick ? label(board[pick[0]][pick[1]]) : 'Chưa chọn'}</div>
-            </div>
-          </div>
-
-          <div className="boardShell">
-            <div className="board" role="grid" aria-label="Bàn cờ tướng">
-              <svg className="boardLines" viewBox="0 0 900 1000" preserveAspectRatio="none" aria-hidden="true"><g stroke="#8b5a2b" strokeWidth="3" fill="none">{Array.from({length:10},(_,r)=><line key={`h${r}`} x1="50" y1={50+r*100} x2="850" y2={50+r*100}/>)}{Array.from({length:9},(_,c)=><React.Fragment key={`v${c}`}><line x1={50+c*100} y1="50" x2={50+c*100} y2="450"/><line x1={50+c*100} y1="550" x2={50+c*100} y2="950"/></React.Fragment>)}<path d="M350 50 L550 250 M550 50 L350 250 M350 750 L550 950 M550 750 L350 950"/></g><text x="450" y="510" textAnchor="middle" fontSize="43" fill="#8b5a2b">楚 河　漢 界</text></svg>
-              {board.map((row, r) => row.map((piece, c) => {
-                const selected = !!pick && pick[0] === r && pick[1] === c
-                const canMove = moveSet.has(`${r}-${c}`)
-                return (
-                  <button key={`${r}-${c}`} type="button" aria-label={`Hàng ${r + 1}, cột ${c + 1}${piece ? `, ${NAMES[piece.side]} ${piece.type}` : ", trống"}${selected ? ", đang chọn" : ""}${canMove ? ", có thể đi tới" : ""}`} aria-pressed={selected} className={boardCellClass(r, c, selected)} onClick={() => clickCell(r, c)}>
-                    {canMove ? <span className="dot" /> : null}
-                    {piece ? <span className={`piece ${piece.side}`}>{label(piece)}</span> : null}
-                  </button>
-                )
-              }))}
-            </div>
-            <div className="meta">
-              <span className="river">Sở Hà • Hán Giới</span>
-              <span className="river">Chạm quân để xem nước đi hợp lệ</span>
-            </div>
-          </div>
-        </section>
-
-        <aside>
-          <section className="card">
-            <h2>Luật đã cài</h2>
-            <ul className="rules">
-              <li>Đầy đủ luật đi quân cơ bản của cờ tướng.</li>
-              <li>Có chặn chân mã, chặn mắt tượng, pháo ăn cần đúng 1 vật cản.</li>
-              <li>Cấm lộ mặt tướng.</li>
-              <li>Không cho đi nước khiến phe mình tự bị chiếu.</li>
-              <li>Thắng khi ăn tướng, chiếu bí, hoặc đối thủ hết nước hợp lệ.</li>
-              <li>Chưa phân xử hòa do lặp lại thế cờ, chiếu dai hoặc đuổi bắt dai.</li>
-            </ul>
-          </section>
-
-          <section className="card">
-            <h2>Lịch sử nước đi</h2>
-            {history.length ? (
-              <div className="history">
-                {history.map((x, i) => <div key={i} className="item">{x}</div>)}
-              </div>
-            ) : (
-              <p className="muted">Chưa có nước nào. Bàn cờ đang nín thở.</p>
-            )}
-          </section>
-        </aside>
-      </div>
-    </div>
-  )
+  function reset(){setGame(initialGame());setPick(null);setFeedback('');setConfirm(false)}
+  const cells=Array.from({length:90},(_,index)=>flipped ? 89-index : index)
+  const boardView=<div className="xq-board" role="grid" aria-label="Bàn cờ tướng" data-flipped={flipped}>
+    <svg className="xq-lines" viewBox="0 0 900 1000" preserveAspectRatio="none" aria-hidden="true"><g stroke="#886240" strokeWidth="2.3" fill="none">{Array.from({length:10},(_,r)=><line key={`h${r}`} x1="50" y1={50+r*100} x2="850" y2={50+r*100}/>)}{Array.from({length:9},(_,c)=><React.Fragment key={`v${c}`}><line x1={50+c*100} y1="50" x2={50+c*100} y2="450"/><line x1={50+c*100} y1="550" x2={50+c*100} y2="950"/></React.Fragment>)}<path d="M350 50 L550 250 M550 50 L350 250 M350 750 L550 950 M550 750 L350 950"/></g><text x="450" y="512" textAnchor="middle" fontSize="30" fill="#886240">SỞ HÀ　•　HÁN GIỚI</text></svg>
+    {cells.map(index=>{
+      const r=Math.floor(index/9),c=index%9,piece=board[r][c],chosen=sameSquare(pick,[r,c]),canMove=moveSet.has(`${r}-${c}`),origin=sameSquare(last?.from,[r,c]),destination=sameSquare(last?.to,[r,c])
+      return <button key={`${r}-${c}`} type="button" className={`cell xq-cell${chosen?' xq-selected':''}${origin?' xq-last-origin':''}${destination?' xq-last-destination':''}${canMove&&piece?' xq-capture':''}`} data-row={r} data-col={c} aria-label={`Hàng ${r+1}, cột ${c+1}${piece?`, ${NAMES[piece.side]} ${piece.type}, ${PIECE_NAMES[piece.type]}`:', trống'}${chosen?', đang chọn':''}${canMove?', có thể đi tới':''}${origin?', ô xuất phát nước vừa đi':''}${destination?', ô đến nước vừa đi':''}`} aria-pressed={!!chosen} onClick={()=>clickCell(r,c)}>
+        {coordinates && <span className="xq-coordinate" aria-hidden="true">{r+1},{c+1}</span>}
+        {piece && <span className={`xq-piece ${piece.side}`} aria-hidden="true">{label(piece)}</span>}
+        {canMove && !piece && <span className="xq-dot" aria-hidden="true"/>}
+      </button>
+    })}
+  </div>
+  return <><PlayLayout id="xiangqi" title="Cờ tướng" ratio={.9} reserve={260} saved={saved}
+    status={<><strong>{winner?`Thắng: ${NAMES[winner]} • ${END_REASONS[reason]}`:checked?`${NAMES[turn]} đang bị chiếu`:`Lượt ${NAMES[turn]}`}</strong><small className="xq-selection">{selected?`Đã chọn ${PIECE_NAMES[selected.type]} ${NAMES[selected.side]} · ${pick[0]+1},${pick[1]+1}`:winner?'Có thể Undo để chơi tiếp.':'Chạm quân, rồi chạm ô đích.'}</small></>}
+    statusTone={winner?'xq-won':checked?'xq-check':''} board={boardView} feedback={feedback}
+    controls={<><button onClick={()=>navigate(-1)} disabled={cursor===0} aria-label="Undo">↶ Đi lại</button><button onClick={()=>navigate(1)} disabled={cursor===timeline.length} aria-label="Redo">↷ Đi tiếp</button><button onClick={()=>{setGame({...game,flipped:!flipped});setPick(null);setFeedback('')}} aria-pressed={flipped}>Xoay bàn</button></>}
+    tools={<><button onClick={()=>setConfirm(true)}>Ván mới</button><label><input type="checkbox" checked={coordinates} onChange={event=>setGame({...game,coordinates:event.target.checked})}/> Hiện tọa độ hàng,cột</label><p className="play-hint">Hai người cùng thiết bị. Ván được lưu tự động.</p></>}
+    details={<><details><summary>Cách chơi</summary><p>Đỏ đi trước. Chạm quân để xem nước hợp lệ: chấm xanh là ô trống, vòng đỏ là quân có thể ăn. Nền vàng đánh dấu nước vừa đi.</p><ul><li>Tướng và Sĩ ở trong cung; Tượng không qua sông.</li><li>Mã bị cản chân, Tượng bị cản mắt. Pháo cần đúng một quân làm ngòi khi ăn.</li><li>Không để hai tướng lộ mặt hoặc để tướng mình bị chiếu.</li><li>Chiếu bí hoặc hết nước hợp lệ đều thua.</li><li>Chưa phân xử lặp thế, chiếu dai và đuổi bắt dai.</li></ul></details><details><summary>Lịch sử nước đi ({cursor})</summary>{cursor?<ol className="xq-history">{timeline.slice(0,cursor).map((entry,index)=><li key={index}>{entry.description}</li>)}</ol>:<p>Chưa có nước đi.</p>}<p className="play-hint">Tọa độ hàng,cột cố định dù xoay bàn.</p></details></>}/><ConfirmDialog open={confirm} onCancel={()=>setConfirm(false)} onConfirm={reset}/></>
 }
