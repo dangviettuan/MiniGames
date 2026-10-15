@@ -1,0 +1,16 @@
+.play-xiangqi .xq-board{width:100%;aspect-ratio:9/10;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr));position:relative;background:#f0d3a2;border:2px solid #886240;border-radius:12px;overflow:hidden;container-type:inline-size;box-shadow:0 8px 24px #78522e16}
+.play-xiangqi .xq-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.play-xiangqi .xq-cell{position:relative;min-width:0;min-height:0;padding:0;border:0;background:transparent;touch-action:manipulation;cursor:pointer}
+.play-xiangqi .xq-last-origin{background:#f4bf494f;box-shadow:inset 0 0 0 2px #a16b26}
+.play-xiangqi .xq-last-destination{background:#f4bf497f;box-shadow:inset 0 0 0 2px #a16b26}
+.play-xiangqi .xq-piece{position:absolute;inset:8%;display:grid;place-items:center;border-radius:50%;background:#fff9e9;border:2px solid #343e37;color:#29372f;box-shadow:0 2px 3px #3c302c29;font-family:'Noto Sans SC','Noto Sans CJK SC','PingFang SC','Microsoft YaHei',sans-serif;font-size:clamp(14px,5.3cqw,36px);font-weight:700;line-height:1;user-select:none}
+.play-xiangqi .xq-piece.red{color:#aa2b31;border-color:#aa2b31}
+.play-xiangqi .xq-selected .xq-piece{background:#e0f1d9;outline:3px solid #22654b;outline-offset:1px}
+.play-xiangqi .xq-capture::after{content:'';position:absolute;inset:2%;border:3px dashed #b22f37;border-radius:50%;pointer-events:none}
+.play-xiangqi .xq-dot{position:absolute;left:50%;top:50%;width:24%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);background:#275d43;box-shadow:0 0 0 2px #fffc}
+.play-xiangqi .xq-coordinate{position:absolute;bottom:0;left:1px;font-size:clamp(7px,1.8cqw,11px);line-height:1;color:#604522;z-index:2;pointer-events:none}
+.play-xiangqi .xq-selection{display:block;font-weight:400;color:var(--play-muted);line-height:1.4;margin-top:2px}
+.play-xiangqi .xq-check{color:#aa2b31}.play-xiangqi .xq-won{color:#255846}
+.play-xiangqi .xq-history{max-height:220px;overflow:auto;margin:8px 0;padding-left:24px}
+.play-xiangqi .xq-history li{padding:3px 0}
+.play-xiangqi .xq-cell:focus-visible{outline:3px solid #2563eb;outline-offset:-3px;z-index:3}

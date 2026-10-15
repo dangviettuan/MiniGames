@@ -18,7 +18,7 @@ test('game navigation preserves each active board and browser history', async ({
   }
   await links.first().click()
   await expect(board.getByRole('button',{name:/Hàng 6, cột 1, Đỏ soldier/})).toBeVisible()
-  await expect(page.getByRole('button',{name:/Undo/})).toBeEnabled()
+  await expect(page.getByRole('button',{name:/Undo|Hoàn tác|Đi lại/})).toBeEnabled()
   await testInfo.attach('xiangqi', {body:await page.screenshot(),contentType:'image/png'})
   if (count > 1) {
     await page.goBack()
