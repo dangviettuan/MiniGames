@@ -46,6 +46,6 @@ test('corrupted saved record safely returns to opening',async({page})=>{
 })
 test('whole board, status and controls fit laptop, tablet and small phone profiles without scrolling',async({page},testInfo)=>{
  for(const[width,height]of [[1366,768],[1194,834],[834,1194],[393,851],[360,640],[851,393]]){
-  await page.setViewportSize({width,height});await fullPlayVisible(page);await move(page,[6,2],[5,2]);await press(page,page.getByRole('button',{name:/Undo/}));await press(page,cell(page,6,2));await press(page,cell(page,6,3));await expect(page.getByRole('alert')).toBeInViewport({ratio:1});await press(page,cell(page,6,2));await fullPlayVisible(page);await page.screenshot({path:testInfo.outputPath(`xiangqi-${width}x${height}.png`)})
+  await page.setViewportSize({width,height});await fullPlayVisible(page);for(const [r,c]of [[0,0],[0,8],[9,0],[9,8]])await expect(cell(page,r,c)).toBeInViewport({ratio:1});await move(page,[6,2],[5,2]);await press(page,page.getByRole('button',{name:/Undo/}));await press(page,cell(page,6,2));await press(page,cell(page,6,3));await expect(page.getByRole('alert')).toBeInViewport({ratio:1});await press(page,cell(page,6,2));await fullPlayVisible(page);await page.screenshot({path:testInfo.outputPath(`xiangqi-${width}x${height}.png`)})
  }
 })
