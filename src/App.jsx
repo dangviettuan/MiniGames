@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react'
 
-import { RED, NAMES, initBoard, label, enemy, clone, findGeneral, anyMove, inCheck, legal, legalMoves } from './xiangqi/engine.js'
+import { RED, NAMES, initBoard, label, clone, inCheck, legalMoves, playMove } from './xiangqi/engine.js'
+
+const END_REASONS = { capture: 'Ăn tướng', checkmate: 'Chiếu bí', stalemate: 'Hết nước hợp lệ' }
+const PIECE_NAMES = { general: 'Tướng', advisor: 'Sĩ', elephant: 'Tượng', horse: 'Mã', rook: 'Xe', cannon: 'Pháo', soldier: 'Tốt' }
 
 function boardCellClass(r, c, selected) {
   let cls = 'cell'
@@ -14,6 +17,7 @@ export default function App() {
   const [turn, setTurn] = useState(RED)
   const [pick, setPick] = useState(null)
   const [winner, setWinner] = useState(null)
+  const [winnerReason, setWinnerReason] = useState(null)
   const [timeline, setTimeline] = useState([])
   const [cursor, setCursor] = useState(0)
   const history = timeline.slice(0, cursor).map(entry => entry.description).reverse()
@@ -33,6 +37,7 @@ export default function App() {
     setTurn(RED)
     setPick(null)
     setWinner(null)
+    setWinnerReason(null)
     setTimeline([])
     setCursor(0)
   }
@@ -44,6 +49,7 @@ export default function App() {
     setBoard(clone(state.board))
     setTurn(state.turn)
     setWinner(state.winner)
+    setWinnerReason(state.reason)
     setPick(null)
     setCursor(target)
   }
@@ -54,30 +60,24 @@ export default function App() {
     if (pick) {
       const [sr, sc] = pick
       if (piece && piece.side === turn) {
-        setPick([r, c])
+        setPick(sr === r && sc === c ? null : [r, c])
         return
       }
-      if (legal(board, [sr, sc], [r, c])) {
-        const next = clone(board)
-        const moving = next[sr][sc]
-        const captured = next[r][c]
-        next[r][c] = moving
-        next[sr][sc] = null
-
-        const nextTurn = enemy(turn)
-        const live = !!findGeneral(next, nextTurn)
-        const foeHasMove = live ? anyMove(next, nextTurn) : false
-
-        setBoard(next)
+      const result = playMove(board, turn, [sr, sc], [r, c])
+      if (result) {
+        const moving = board[sr][sc]
+        const captured = board[r][c]
+        setBoard(result.board)
+        setTurn(result.turn)
+        setWinner(result.winner)
+        setWinnerReason(result.reason)
         setPick(null)
-        setTimeline(prev => [...prev.slice(0, cursor), { before: { board: clone(board), turn, winner }, after: { board: clone(next), turn: (!live || !foeHasMove) ? turn : nextTurn, winner: (!live || !foeHasMove) ? turn : null }, description: `${NAMES[turn]}: ${moving.type} ${sr},${sc} → ${r},${c}${captured ? ` ăn ${captured.type}` : ''}` }])
+        setTimeline(prev => [...prev.slice(0, cursor), {
+          before: { board: clone(board), turn, winner, reason: winnerReason },
+          after: result,
+          description: `${NAMES[turn]}: ${PIECE_NAMES[moving.type]} ${sr + 1},${sc + 1} → ${r + 1},${c + 1}${captured ? ` ăn ${PIECE_NAMES[captured.type]}` : ''}`,
+        }])
         setCursor(cursor + 1)
-
-        if (!live || !foeHasMove) {
-          setWinner(turn)
-        } else {
-          setTurn(nextTurn)
-        }
         return
       }
     }
@@ -99,7 +99,7 @@ export default function App() {
 
         .card{background:rgba(255,250,244,.9);border:1px solid rgba(139,92,45,.18);backdrop-filter:blur(8px);border-radius:24px;box-shadow:0 14px 38px rgba(120,53,15,.1);padding:18px}
         .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
-        h1{font-size:clamp(24px,3.8vw,42px);line-height:1.08;margin:0 0 8px}
+        .app h1{font-size:clamp(24px,3.8vw,42px);line-height:1.08;margin:0 0 8px}
         .sub{margin:0;color:var(--muted);font-size:clamp(14px,1.7vw,18px)}
 
         .btn{border:none;border-radius:14px;padding:12px 18px;background:linear-gradient(135deg,#f97316,#c2410c);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(194,65,12,.28);min-height:46px}
@@ -122,8 +122,8 @@ export default function App() {
         .meta{display:flex;justify-content:space-between;gap:14px;margin-top:10px;color:#7c2d12;font-weight:700}
         .river{font-size:clamp(12px,1.4vw,15px);opacity:.88}
 
-        aside{display:grid;gap:20px;align-content:start}
-        h2{margin:0 0 12px;font-size:22px}
+        .app aside{display:grid;gap:20px;align-content:start}
+        .app h2{margin:0 0 12px;font-size:22px}
         .rules{margin:0;padding-left:18px;line-height:1.65;color:#44403c}
         .history{display:grid;gap:8px;max-height:460px;overflow:auto;padding-right:2px}
         .item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;color:#334155;font-size:14px}
@@ -136,7 +136,7 @@ export default function App() {
           .card{padding:16px}
           .boardShell{padding:12px}
           .piece{font-size:clamp(22px,3.2vw,34px)}
-          aside{grid-template-columns:1fr 1fr;gap:16px}
+          .app aside{grid-template-columns:1fr 1fr;gap:16px}
         }
 
         @media (max-width:767px){
@@ -144,11 +144,10 @@ export default function App() {
           .wrap{grid-template-columns:1fr}
           .top{flex-direction:column;align-items:stretch}
           .btn{width:100%}.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.controls .btn{padding:10px 4px;font-size:13px}
-          .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:last-child{grid-column:1/-1}
-          .boardShell{padding:10px}
-          .piece{inset:9%;font-size:clamp(20px,7vw,30px)}
-          aside{gap:14px}
-          h2{font-size:20px}
+          .card{padding:10px}.top{gap:10px}.sub{font-size:13px}.stats{gap:6px;grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:8px 6px}.k{font-size:10px}.v{font-size:14px}.boardShell{padding:5px}.meta{gap:8px}.river{font-size:11px}
+          .piece{inset:6%;border-width:2px;font-size:clamp(15px,5.3vw,28px)}
+          .app aside{gap:14px}
+          .app h2{font-size:20px}
         }
       `}</style>
 
@@ -157,19 +156,19 @@ export default function App() {
           <div className="top">
             <div>
               <h1>Cờ tướng 2 người chơi</h1>
-              <p className="sub">UI tối ưu cho cảm ứng iPad, dễ nhìn khi đặt ngang hoặc dọc.</p>
+              <p className="sub">Hai người cùng thiết bị. Đỏ đi trước; chạm quân rồi chạm ô đích.</p>
             </div>
             <div className="controls"><button className="btn secondary" onClick={() => navigate(-1)} disabled={cursor === 0}>↶ Undo</button><button className="btn secondary" onClick={() => navigate(1)} disabled={cursor === timeline.length}>↷ Redo</button><button className="btn" onClick={reset}>Ván mới</button></div>
           </div>
 
-          <div className="stats">
+          <div className="stats" role="status" aria-live="polite" aria-atomic="true">
             <div className="stat">
               <div className="k">Lượt hiện tại</div>
               <div className="v">{winner ? 'Kết thúc' : NAMES[turn]}</div>
             </div>
             <div className="stat">
               <div className="k">Trạng thái</div>
-              <div className="v">{winner ? `Thắng: ${NAMES[winner]}` : checked ? `${NAMES[turn]} đang bị chiếu` : 'Bình thường'}</div>
+              <div className="v">{winner ? `Thắng: ${NAMES[winner]} • ${END_REASONS[winnerReason]}` : checked ? `${NAMES[turn]} đang bị chiếu` : 'Bình thường'}</div>
             </div>
             <div className="stat">
               <div className="k">Quân đang chọn</div>
@@ -207,6 +206,7 @@ export default function App() {
               <li>Cấm lộ mặt tướng.</li>
               <li>Không cho đi nước khiến phe mình tự bị chiếu.</li>
               <li>Thắng khi ăn tướng, chiếu bí, hoặc đối thủ hết nước hợp lệ.</li>
+              <li>Chưa phân xử hòa do lặp lại thế cờ, chiếu dai hoặc đuổi bắt dai.</li>
             </ul>
           </section>
 
