@@ -49,21 +49,24 @@ test('rules, blocking, dice replay, selection, undo/redo and reset', async ({ pa
   await expect(board.getByRole('button', { name: 'Ô đường đua 1, Đỏ ngựa 1' })).toBeVisible()
   await roll(page)
   // Own horse blocks the starting square: only horse 1 can move.
-  await expect(page.getByRole('complementary', { name: 'Chọn nước đi' }).getByRole('button', { name: /^Ngựa 2 / })).toBeDisabled()
+  await page.getByRole('complementary', { name: 'Chọn nước đi' }).getByRole('button', { name: /^Ngựa 2 / }).click()
+  await expect(page.getByRole('alert')).toContainText('Ô xuất phát có ngựa cùng màu')
   await chooseAndMove(page, 0)
   await expect(page.getByText('Lượt Vàng', { exact: true })).toBeVisible()
   await roll(page)
   await expect(page.getByRole('status')).toContainText('không có nước hợp lệ')
-  await expect(page.getByText('Lượt Đỏ', { exact: true })).toBeVisible()
+  await expect(page.getByRole('status').getByText('Lượt Đỏ', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await roll(page)
   await expect(page.getByLabel('Xúc xắc 2', { exact: true })).toBeVisible()
   await expect(page.getByRole('status')).toContainText('không có nước hợp lệ')
   const size = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, viewport: innerWidth }))
   expect(size.doc).toBeLessThanOrEqual(size.viewport)
+  await page.getByLabel('Tùy chọn Cờ cá ngựa', { exact: true }).click()
   await page.getByRole('button', { name: 'Ván mới', exact: true }).click()
   await page.getByRole('button', { name: 'Tiếp tục ván này' }).click()
   await expect(board).toBeVisible()
+  await page.getByLabel('Tùy chọn Cờ cá ngựa', { exact: true }).click()
   await page.getByRole('button', { name: 'Ván mới', exact: true }).click()
   await page.getByRole('button', { name: 'Đồng ý, chọn lại luật' }).click()
   await page.getByRole('button', { name: 'Bắt đầu chơi' }).click()
@@ -78,6 +81,7 @@ test('four-player setup with six-only rule automatically skips unusable roll', a
   await page.getByRole('button', { name: 'Bắt đầu chơi' }).click()
   await roll(page)
   await expect(page.getByText('Lượt Xanh lá', { exact: true })).toBeVisible()
+  await expect(page.locator('.horse-entry-marker')).toHaveCount(4)
   await roll(page)
   await chooseAndMove(page, 0)
   await expect(page.getByRole('button', { name: 'Ô đường đua 15, Xanh lá ngựa 1' })).toBeVisible()
@@ -148,4 +152,82 @@ test('393px phone keeps full board and whole turn dock visible without scrolling
   await chooseAndMove(page, 0)
   expect(await page.evaluate(() => scrollY)).toBe(0)
   await expect(board).toBeInViewport({ ratio: 1 })
+})
+
+
+test('pending die, complete replay tape and history survive reload', async ({ page }) => {
+  await prepare(page, [6, 1])
+  await page.getByRole('button', { name: 'Bắt đầu chơi' }).click()
+  await roll(page)
+  await page.reload()
+  await expect(page.getByLabel('Xúc xắc 6', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Gieo xúc xắc', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await roll(page)
+  await expect(page.getByLabel('Xúc xắc 6', { exact: true })).toBeVisible()
+  await chooseAndMove(page, 0)
+  await expect(page.getByLabel('Nước vừa đi', { exact: true })).toContainText('Đỏ · ngựa 1')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Ô đường đua 1, Đỏ ngựa 1', exact: true })).toHaveClass(/horse-last-to/)
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(page.getByLabel('Xúc xắc 6', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Redo', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Ô đường đua 1, Đỏ ngựa 1', exact: true })).toBeVisible()
+})
+
+for (const viewport of [{ width: 360, height: 640 }, { width: 851, height: 393 }]) {
+  test(`readable board and contained horses at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await prepare(page, [6, 6])
+    await page.getByLabel('Số người chơi').selectOption('4')
+    await page.getByRole('button', { name: 'Bắt đầu chơi' }).click()
+    const board = page.getByRole('group', { name: 'Bàn cờ cá ngựa, đường đua 56 ô' })
+    const bounds = await board.boundingBox()
+    expect(bounds.width).toBeGreaterThanOrEqual(viewport.width === 360 ? 320 : 280)
+    await roll(page)
+    await chooseAndMove(page, 0)
+    await expect(board).toBeInViewport({ ratio: 1 })
+    for (const name of ['Gieo xúc xắc', 'Chọn một ngựa để đi']) await expect(page.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 })
+    const geometry = await board.evaluate(board => ({
+      fits: [...board.querySelectorAll('.horse-token')].every(token => {
+        const box = token.getBoundingClientRect(), cell = token.parentElement.getBoundingClientRect()
+        return box.left >= cell.left && box.right <= cell.right + 0.5 && box.top >= cell.top && box.bottom <= cell.bottom + 0.5
+      }),
+      cell: board.querySelector('.horse-cell').getBoundingClientRect().width,
+      doc: document.documentElement.scrollWidth,
+      viewport: innerWidth,
+    }))
+    expect(geometry.fits).toBe(true)
+    expect(geometry.cell).toBeGreaterThanOrEqual(16)
+    expect(geometry.doc).toBeLessThanOrEqual(geometry.viewport)
+    await expect(page.getByLabel('Nước vừa đi', { exact: true })).toContainText('Đỏ · ngựa 1')
+    await expect(page.getByRole('button', { name: 'Ô đường đua 1, Đỏ ngựa 1', exact: true })).toHaveClass(/horse-last-to/)
+    if (viewport.width > viewport.height) {
+      await expect(board).toBeInViewport({ ratio: 1 })
+      await expect(page.getByRole('button', { name: 'Gieo xúc xắc', exact: true })).toBeInViewport({ ratio: 1 })
+      await expect(page.getByRole('button', { name: 'Chọn một ngựa để đi' })).toBeInViewport({ ratio: 1 })
+    }
+  })
+}
+
+test('malformed persisted game safely returns to setup', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('minigames:game:v1:co-ca-ngua', JSON.stringify({ version: 1, data: { game: { horses: null }, players: 2, startRule: 'one-or-six' } })))
+  await page.goto('./#co-ca-ngua')
+  await expect(page.getByRole('button', { name: 'Bắt đầu chơi' })).toBeVisible()
+})
+
+test('Yellow capturing Red identifies the moving horse rather than the captured horse', async ({ page }) => {
+  await prepare(page, [1, 6, 6, 6, 6, 6, 3, 1, 2])
+  await page.getByRole('button', { name: 'Bắt đầu chơi' }).click()
+  for (let i = 0; i < 9; i++) {
+    await roll(page)
+    await chooseAndMove(page, 0)
+  }
+  await expect(page.getByRole('status')).toContainText('Đá ngựa Đỏ về chuồng')
+  await expect(page.getByLabel('Nước vừa đi', { exact: true })).toContainText('Vàng · ngựa 1')
+  await expect(page.getByRole('button', { name: 'Ô đường đua 2, Vàng ngựa 1', exact: true })).toHaveClass(/horse-last-to/)
+  await expect(page.getByRole('button', { name: 'Ô đường đua 56, trống', exact: true })).toHaveClass(/horse-last-from/)
+  await expect(page.getByRole('button', { name: 'Đỏ ngựa 1 trong chuồng', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Nước vừa đi', { exact: true })).toContainText('Vàng · ngựa 1')
 })

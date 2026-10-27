@@ -1,54 +1,58 @@
-# Xiangqi review and test coverage
+# Cờ tướng: gameplay and responsive UI
 
-The game is local two-player Xiangqi. Red moves first. The engine is independent
-of React: `playMove(board, turn, from, to)` validates ownership and legality,
-returns a new board and the next turn, and resolves the winner/reason. Illegal
-moves return `null` without modifying the input.
+Local two-player Xiangqi, Red first. The engine is independent of React:
+`playMove(board, turn, from, to)` validates turn and legality, returns a new board
+and resolves the winner/reason. Invalid moves never modify the board.
 
-Implemented rules include palace and river restrictions, blocked horse legs and
-elephant eyes, the cannon screen, flying generals, self-check prevention,
-capture, checkmate, and stalemate. **Stalemate is a loss** in Xiangqi. Repetition,
-perpetual check/chase adjudication and tournament no-progress limits are not
-implemented; the game states this limitation in its rules panel.
+Rules include palace and river restrictions, blocked horse legs and elephant
+eyes, cannon screens, flying generals, self-check prevention, capture, checkmate
+and stalemate. **Stalemate is a loss.** Repetition and perpetual-check/chase
+adjudication remain unsupported and are disclosed in “Cách chơi”.
 
-## Review changes
+## Playing UI
 
-- Scope sidebar and heading styles to Xiangqi so tablet layout cannot leak into other games.
+- Uses the shared `PlayLayout` shell. Desktop and landscape keep the board left
+  and status/actions right. Portrait uses a compact header, board and controls.
+  All Xiangqi styles are scoped; this game injects no body or global layout CSS.
+- Selected pieces have a green outline and a Vietnamese name in the status.
+  Empty legal destinations have green dots; legal captures have red dashed rings.
+  The last move's origin and destination have gold backgrounds/borders.
+- Invalid moves retain the selection and explain how to choose a valid target.
+- Undo, Redo and “Xoay bàn” remain directly visible, including after a result.
+  Rotation changes only the view. Optional fixed row/column coordinates match
+  the one-based history labels, regardless of orientation.
+- “Ván mới” is in “Tùy chọn” and requires confirmation. Cancel preserves the game.
+  “Cách chơi” and history start collapsed.
 
-- Fixed an infinite loop in exported `between` for identical endpoints.
-- Moved terminal resolution and turn validation out of the UI into the engine.
-  The UI now distinguishes checkmate, stalemate and general capture.
-- Tapping an already selected piece deselects it.
-- The status announces turn/check/win updates with a polite live region.
-- History uses Vietnamese piece names and one-based coordinates matching cell
-  labels. Undo/Redo preserve terminal results; a new move truncates the redo branch.
-- Reduced mobile padding, condensed status cards, and scaled piece text/borders
-  to retain usable space at 320px width.
-- Use widely supported 馬/車 glyphs for red horse/rook; rare 傌/俥 glyphs
-  were missing in available CJK fonts, producing blank-looking pieces.
+## Saved games
+
+The shared storage hook saves board, turn, winner/reason, the complete timeline,
+cursor, orientation and coordinate preference. Selection, feedback and dialogs
+are transient. Reload preserves an undone cursor and its redo branch, including
+terminal states. A new move after Undo replaces the old redo branch.
+
+Saved data is validated by replaying every move from the standard initial board
+and comparing snapshots. Fabricated winners, invalid transitions, corrupted
+boards and invalid cursor/orientation settings fall back to a fresh game. Storage
+failure is reported by the shared shell and does not prevent play.
 
 ## Verification
 
-`npm test`: 17 engine tests pass. Besides basic piece rules, coverage includes
-44 opening moves per side, pinned pieces, immutable application, wrong-turn
-rejection, checkmate, stalemate and capture.
-
-`npm run build`: passes.
-
-Playwright: five real interaction scenarios, each run on desktop Chromium,
-iPad-sized touch Chromium and Pixel 7 Chromium (15 checks pass locally):
-
-1. Alternating legal moves and capture, then Undo/Redo restoring pieces and turn.
-2. Illegal destinations, opponent selection and selected-piece deselection.
-3. Undo followed by another move truncating Redo; reset clearing all state.
-4. A 17-ply double-cannon checkmate played from the standard opening using only
-   board clicks; terminal interaction lock, Undo reopening play, Redo restoring
-   the win and reset reopening a fresh game.
-5. Viewport bounds, distinct touch cells, no horizontal page overflow and a legal
-   horse move without runtime errors.
-
-Manual screenshot review additionally checked 320px, Pixel 7 and iPad portrait
-sizes. The board fits horizontally at each size. Installed temporary CJK fonts for local screenshot QA and corrected the red
-horse/rook glyph fallback after inspecting the rendered board. Actual iPad Safari
-coverage uses the configured WebKit project in GitHub Actions and must pass
-before merge. The local iPad-shaped Chromium run is not Safari coverage.
+- 19 Xiangqi unit tests pass: 17 engine tests plus two saved-state tests covering
+  exact replay/cursor/orientation and rejection of corrupted records.
+- The production build passes.
+- Seven Playwright scenarios run on desktop, iPad-sized touch Chromium and mobile
+  touch Chromium: 21 passing checks. They cover capture/highlights, illegal-move
+  feedback and selection/capture markers, reload/branch/orientation, coordinate
+  controls and confirmed/cancelled reset, terminal persistence, corrupt storage,
+  and full-viewport gameplay.
+- The terminal test plays a legal 17-ply double-cannon mate from the standard
+  opening via real board actions. It checks terminal lock, reload, Undo and Redo.
+- The profile test runs 1366×768, 1194×834, 834×1194, 393×851, 360×640 and 851×393
+  in every project. Touch contexts use actual `tap()` actions. Before each
+  action, the target must already be entirely in the viewport; tests also check
+  the full board, status, controls, invalid feedback and zero page scroll. This
+  avoids Playwright's automatic scrolling concealing layout defects.
+- Screenshots were reviewed at laptop and small-phone sizes; CJK glyphs render
+  correctly with the local QA font installed. The iPad-shaped local Chromium
+  run is not Safari coverage. The configured WebKit project must pass CI.
